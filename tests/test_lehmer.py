@@ -47,6 +47,3 @@ class TestLehmer:
 
         p0_recon = lc.code2perm(c0, minvalue=minvalues)
         assert np.all(p0_recon == p1)
-
-
-

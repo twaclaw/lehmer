@@ -133,7 +133,7 @@ class Lehmer:
         if squeeze is None:
             squeeze = self.squeeze
         results = np.sum(upper_triangle, axis=2, dtype=self.dtype)
-        results =  results.squeeze() if squeeze else results
+        results = results.squeeze() if squeeze else results
         if return_minvalue:
             return results, minvalue.squeeze()
         return results
@@ -301,7 +301,7 @@ class Lehmer:
             factory = factory * matrix
             factory = factory[~np.isnan(factory)].reshape(ncodes, -1)
 
-        squeeze  = squeeze or self.squeeze
+        squeeze = squeeze or self.squeeze
 
         if minvalue is not None:
             perm += minvalue

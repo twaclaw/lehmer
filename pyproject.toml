@@ -45,9 +45,9 @@ build-backend = "hatchling.build"
 
 
 [project.urls]
-Homepage = "https://github.com/twaclaw/mit-scheme-kernel"
-Documentation = "https://github.com/twaclaw/mit-scheme-kernel"
-Issues = "https://github.com/twaclaw/mit-scheme-kernel/issues"
+Homepage = "https://github.com/twaclaw/lehmer"
+Documentation = "https://github.com/twaclaw/lehmer"
+Issues = "https://github.com/twaclaw/lehmer/issues"
 
 [tool.hatch.version]
 source = "vcs"
@@ -57,10 +57,7 @@ packages = ["src/lehmer"]
 
 
 [tool.hatch.build.targets.sdist]
-include = [
-    "src/lehmer",
-    "README.md",
-]
+include = ["src/lehmer", "README.md"]
 
 [tool.hatch.envs.default]
 installer = "uv"

@@ -112,7 +112,11 @@ See the docstrings for more details.
 ## A note on the performance
 
 `perm2code` doesn't have any Python loops. `code2perm` has a single Python loop over `n`,
-which I didn't manage to eliminate yet. I implemented a second version of `perm2code`, namely `perm2code_2`, which has a loop over `n` but can be faster or more memory efficient depending on `n` and the batch size (for instance if `n` or `b` are "big"). See [this notebook](notebooks/performance_comp.ipynb) for a performance comparison. You have to see which implementation works better for your use case.
+which I didn't manage to eliminate yet. Maybe it is not possible.
+
+I implemented a second version of `perm2code`, namely `perm2code_2`, which has a loop over `n`. This implementation is more memory-efficient and can be faster depending on `n` and the batch size `b`. See [this notebook](./notebooks/performance_comp.ipynb) for a performance comparison.
+
+You have to see which implementation works better for your use case. `encode` uses `perm2code`. If you want to use `perm2code_2`, you have to call the individual methods directly.
 
 
 ## Contributing

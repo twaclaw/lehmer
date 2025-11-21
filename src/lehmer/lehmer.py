@@ -15,7 +15,7 @@ class Lehmer:
         """Creates an instance of the Lehmer class for encoding and decoding permutations.
 
         Args:
-            n (int): Size of the permutations/codes.
+            n (int): Length of the permutations/codes.
             squeeze (bool, optional): Defines the global, default behavior for
                 whether results of shape (1, n) should be squeezed. Defaults to False.
             dtype (numpy.dtype, optional): Global, default type for results. Must
@@ -41,13 +41,15 @@ class Lehmer:
                    [1, 2, 0, 3],
                    [0, 1, 3, 2],
                    [0, 1, 2, 3]], dtype=uint64)
+
+        Raises:
+            ValueError: If dtype is not an unsigned integer type.
         """
         self.n = n
         self.squeeze = squeeze
         self.dtype = dtype
         self.validate_inputs = validate_inputs
-        if not np.issubdtype(self.dtype, np.integer):
-            raise ValueError("dtype must be an unsigned integer type")
+        self._validate_type(dtype)
 
         self.factorials = None
         if precompute_factorials:
@@ -71,7 +73,7 @@ class Lehmer:
 
         Args:
             perms (numpy.ndarray | list): Can be a list or a
-                numpy array of shape (b, n), where b is the batch size and n is
+                numpy array of shape (n,) or (b, n), where b is the batch size and n is
                 the permutation length.
             minvalue (numpy.ndarray | list[int] | int,  optional): The
                 minimum value required to make the permutations 0-indexed. If None, it is computed
@@ -107,7 +109,7 @@ class Lehmer:
 
         dtype = perms.dtype if isinstance(perms, np.ndarray) else self.dtype
 
-        perms = np.asarray(perms, dtype=self.dtype)
+        perms = np.asarray(perms, dtype=dtype)
 
         if perms.ndim < 2:
             perms = perms[np.newaxis, :]
@@ -123,29 +125,30 @@ class Lehmer:
             tiles = np.tile(np.arange(self.n), (perms.shape[0], 1))
             if not np.all(np.sort(perms, axis=-1) - minvalue == tiles):
                 raise ValueError("Invalid permutation found!")
+            if minvalue.shape[0] > 1 and minvalue.shape[0] != perms.shape[0]:
+                raise ValueError("minvalue must have the same batch size as perms")
 
-            if minvalue.ndim > 0 and minvalue.shape[0] != perms.shape[0]:
-                raise ValueError("minvalue must be a scalar or have the same batch size as perms")
+        if squeeze is None:
+            squeeze = self.squeeze
 
         perms = perms - minvalue
         comparison = perms[..., np.newaxis] > perms[:, np.newaxis, :]
         upper_triangle = np.triu(comparison, k=1)
-        if squeeze is None:
-            squeeze = self.squeeze
-        results = np.sum(upper_triangle, axis=2, dtype=self.dtype)
+        results = np.sum(upper_triangle, axis=2, dtype=dtype)
+
         results = results.squeeze() if squeeze else results
         if return_minvalue:
             return results, minvalue.squeeze()
         return results
 
     def code2index(self, code: np.ndarray | list, squeeze: bool | None = None) -> int:
-        """Converts Lehmer codes to factorial number system indices.
+        """Converts Lehmer codes to integers using the  factorial number system.
 
         Args:
             code (numpy.ndarray | list): Lehmer code(s) to convert. Can be a single
-                code or batch of codes with shape (b, n).
+                code or a batch of codes with shape (b, n).
             squeeze (bool | None, optional): Whether to return a scalar for single
-                codes. If None, uses the instance's squeeze setting. Defaults to None.
+                codes.
 
         Returns:
             int | numpy.ndarray: The factorial index/indices. Returns int if squeeze=True
@@ -183,19 +186,19 @@ class Lehmer:
         if code.ndim < 2:
             code = code[np.newaxis, :]
 
-        results = np.dot(code[..., ::-1], self.factorials[: self.n]).astype(self.dtype)
+        results = np.dot(code[..., ::-1], self.factorials[: self.n]).astype(dtype)
         if squeeze is None:
             squeeze = self.squeeze
         squeeze = results.shape == (1,) and squeeze
         return results.item() if squeeze else results
 
     def index2code(self, index: np.ndarray | list | int, squeeze: bool | None = None) -> np.ndarray:
-        """Converts factorial number system indices to Lehmer codes.
+        """Converts indices to Lehmer codes.
 
         Args:
             index (numpy.ndarray | list | int): The factorial index/indices to convert.
             squeeze (bool | None, optional): Whether to squeeze the result if batch
-                size is 1. If None, uses the instance's squeeze setting. Defaults to None.
+                size is 1. Defaults to None.
 
         Returns:
             numpy.ndarray: The Lehmer code(s) of shape (b, n). If b=1 and squeeze=True,
@@ -209,6 +212,7 @@ class Lehmer:
             >>> lc = Lehmer(4)
             >>> lc.index2code(13)
             array([[2, 0, 1, 0]], dtype=uint64)
+
             >>> lc.index2code([13, 11, 7, 12])
             array([[2, 0, 1, 0],
                    [1, 2, 1, 0],
@@ -249,8 +253,8 @@ class Lehmer:
             codes (numpy.ndarray | list): Lehmer code(s) to convert. Can be a single
                 code or batch of codes with shape (b, n).
             minvalue (int | list[int] | numpy.ndarray | None, optional): The minimum
-                value to add to the permutation elements. If None, permutations start
-                from 0. Defaults to None.
+                value to add to the permutation elements. If None, permutations
+                are 0-indexed. Defaults to None.
             squeeze (bool | None, optional): Whether to squeeze the result if batch
                 size is 1. If None, uses the instance's squeeze setting. Defaults to None.
 
@@ -278,7 +282,7 @@ class Lehmer:
         if self.validate_inputs:
             self._validate_type(dtype)
 
-            if minvalue.ndim > 0 and minvalue.shape[0] != codes.shape[0]:
+            if minvalue is not None and (minvalue.ndim > 0 and minvalue.shape[0] != codes.shape[0]):
                 raise ValueError("minvalue must be a scalar or have the same batch size as perms")
 
         codes = np.asarray(codes, dtype=dtype)
@@ -286,22 +290,15 @@ class Lehmer:
         if codes.ndim < 2:
             codes = codes[np.newaxis, :]
 
-        ncodes = codes.shape[0]
+        perm = codes.copy()
 
-        factory = np.tile(np.arange(self.n), (ncodes, 1))
+        for i in range(perm.shape[1] - 2, -1, -1):
+            current = perm[:, i : i + 1]
+            right_slice = perm[:, i + 1 :]
+            right_slice[right_slice >= current] += 1
 
-        perm = np.zeros_like(codes)
-
-        # TODO check whether this can be factorized
-        for i in range(self.n):
-            idx = codes[:, i]
-            matrix = np.ones_like(factory, dtype=float)
-            matrix[np.arange(ncodes), idx] = np.nan
-            perm[np.arange(ncodes), i] = factory[np.arange(ncodes), idx]
-            factory = factory * matrix
-            factory = factory[~np.isnan(factory)].reshape(ncodes, -1)
-
-        squeeze = squeeze or self.squeeze
+        if squeeze is None:
+            squeeze = self.squeeze
 
         if minvalue is not None:
             perm += minvalue
@@ -323,10 +320,10 @@ class Lehmer:
             int | numpy.ndarray: The factorial index/indices.
 
         Examples:
-            >>> lehmer = Lehmer(n=4)
+            >>> from lehmer import Lehmer
+            >>> lc = Lehmer(n=4)
             >>> perm = [2, 0, 3, 1]
-            >>> idx = lehmer.encode(perm, squeeze=True)
-            >>> idx
+            >>> lehmer.encode(perm, squeeze=True)
             13
         """
         code = self.perm2code(perm, minvalue, squeeze=False)
@@ -354,11 +351,55 @@ class Lehmer:
             numpy.ndarray: The decoded permutation(s).
 
         Examples:
-            >>> lehmer = Lehmer(n=4)
+            >>> from lehmer import Lehmer
+            >>> lc = Lehmer(n=4)
             >>> idx = 13
-            >>> perm = lehmer.decode(idx, squeeze=True)
-            >>> perm
+            >>> lehmer.decode(idx, squeeze=True)
             array([2, 0, 3, 1])
         """
         codes = self.index2code(index, squeeze=False)
         return self.code2perm(codes, squeeze=squeeze)
+
+    def perm2code_2(
+        self,
+        perms: np.ndarray | list,
+        minvalue: np.ndarray | list[int] | int | None = None,
+        squeeze: bool | None = None,
+        return_minvalue: bool = False,
+    ) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
+        """Converts a batch of  permutations to Lehmer codes.
+        An alternative implementation of perm2code.
+        """
+
+        dtype = perms.dtype if isinstance(perms, np.ndarray) else self.dtype
+
+        perms = np.asarray(perms, dtype=dtype)
+
+        if perms.ndim < 2:
+            perms = perms[np.newaxis, :]
+
+        if minvalue is None:
+            minvalue = np.min(perms, axis=1, keepdims=True)
+
+        minvalue = [minvalue] if isinstance(minvalue, int) else minvalue
+        minvalue = np.asarray(minvalue, dtype=dtype).reshape(-1, 1)
+
+        if self.validate_inputs:
+            self._validate_type(dtype)
+            tiles = np.tile(np.arange(self.n), (perms.shape[0], 1))
+            if not np.all(np.sort(perms, axis=-1) - minvalue == tiles):
+                raise ValueError("Invalid permutation found!")
+            if minvalue.shape[0] > 1 and minvalue.shape[0] != perms.shape[0]:
+                raise ValueError("minvalue must have the same batch size as perms")
+
+        if squeeze is None:
+            squeeze = self.squeeze
+
+        results = np.zeros_like(perms)
+        for i in range(perms.shape[1] - 1):
+            results[:, i] = np.sum(perms[:, i + 1 :] < perms[:, i : i + 1], axis=1)
+
+        results = results.squeeze() if squeeze else results
+        if return_minvalue:
+            return results, minvalue.squeeze()
+        return results

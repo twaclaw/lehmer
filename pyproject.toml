@@ -1,7 +1,7 @@
 [project]
 name = "lehmer"
 dynamic = ['version']
-description = "This is a minimal, vectorised and batchable library for computing Lehmer codes."
+description = "A minimal, vectorized and batchable library for computing Lehmer codes."
 readme = "README.md"
 requires-python = ">=3.10"
 classifiers = [
@@ -30,6 +30,8 @@ keywords = [
     "factoradic",
     "batchable",
     "vectorized",
+    "numpy",
+    "rubik's cube"
 ]
 authors = [{ name = "Diego Sandoval", email = "dsandovalv@gmail.com" }]
 maintainers = [{ name = "Diego Sandoval", email = "dsandovalv@gmail.com" }]

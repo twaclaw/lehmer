@@ -358,7 +358,7 @@ class Lehmer:
             array([2, 0, 3, 1])
         """
         codes = self.index2code(index, squeeze=False)
-        return self.code2perm(codes, squeeze=squeeze)
+        return self.code2perm(codes, squeeze=squeeze, minvalue=minvalue)
 
     def perm2code_2(
         self,

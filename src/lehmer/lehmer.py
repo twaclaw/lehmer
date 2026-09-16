@@ -53,7 +53,10 @@ class Lehmer:
 
         self.factorials = None
         if precompute_factorials:
-            self.factorials = np.concatenate([[1], np.cumprod(np.arange(1, self.n + 1).astype(self.dtype))])
+            # The leading 1 must carry self.dtype explicitly: a bare [1] is inferred as
+            # int64, and int64 + uint64 promotes the whole array to float64.
+            ones = np.ones(1, dtype=self.dtype)
+            self.factorials = np.concatenate([ones, np.cumprod(np.arange(1, self.n + 1, dtype=self.dtype))])
 
         self._validate_type(dtype)
 
@@ -234,7 +237,9 @@ class Lehmer:
         if index.ndim < 1:
             index = index[np.newaxis, :]
 
-        divisors = np.arange(1, self.n + 1)
+        # divisors must carry the working dtype: a default int64 arange would promote
+        # an unsigned index back to float64 and lose precision above 2**53.
+        divisors = np.arange(1, self.n + 1, dtype=dtype)
         lehmer_code = (index[..., np.newaxis] // self.factorials[: self.n]) % divisors
         if squeeze is None:
             squeeze = self.squeeze

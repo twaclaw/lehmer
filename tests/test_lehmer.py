@@ -1,3 +1,4 @@
+import math
 from itertools import permutations
 
 import numpy as np
@@ -85,3 +86,15 @@ class TestLehmer:
                 codes1 = lc.perm2code(perms)
                 codes2 = lc.perm2code_2(perms)
                 assert np.all(codes1 == codes2)
+
+    @pytest.mark.parametrize("dtype", [np.uint64, np.int64])
+    def test_factorials_are_exact(self, dtype):
+        """Factorials must keep the integer dtype: a float64 array loses precision
+        above 2**53 and silently breaks encode/decode from n=19 on."""
+        n = 20
+        lc = Lehmer(n=n, dtype=dtype)
+        assert lc.factorials.dtype == dtype
+        assert lc.factorials[n] == math.factorial(n)
+
+        perms = np.array([np.random.permutation(n) for _ in range(100)], dtype=dtype)
+        assert np.all(lc.decode(lc.encode(perms)) == perms)
